@@ -8,6 +8,11 @@ import { FiCheckCircle, FiClock, FiActivity, FiFilter } from "react-icons/fi";
 const API_BASE_URL = "http://localhost:5000/api/tasks";
 const DEFAULT_USER_ID = 5; // Matches the student user seeded in 09_tasks_schema.sql
 
+const normalizeTask = (task) => ({
+  ...task,
+  completed: Boolean(task.completed),
+});
+
 function TaskManager() {
   const [tasks, setTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -28,7 +33,7 @@ function TaskManager() {
       const response = await fetch(`${API_BASE_URL}?userId=${DEFAULT_USER_ID}`);
       if (response.ok) {
         const data = await response.json();
-        setTasks(data);
+        setTasks(data.map(normalizeTask));
         setBackendOnline(true);
         setErrorMsg("");
       } else {
@@ -41,7 +46,7 @@ function TaskManager() {
       // LocalStorage Fallback
       const localTasks = localStorage.getItem(`tasks_user_${DEFAULT_USER_ID}`);
       if (localTasks) {
-        setTasks(JSON.parse(localTasks));
+        setTasks(JSON.parse(localTasks).map(normalizeTask));
       } else {
         // Default seed tasks if no local storage
         const defaultTasks = [
@@ -94,86 +99,110 @@ function TaskManager() {
   // Add Task handler
   const handleAddTask = async (newTaskData) => {
     const fullTaskData = { ...newTaskData, user_id: DEFAULT_USER_ID };
-    
+
+    const addTaskLocally = () => {
+      const localNewTask = normalizeTask({
+        ...fullTaskData,
+        task_id: Date.now(),
+        completed: false,
+        created_at: new Date().toISOString(),
+      });
+      setTasks((prev) => [localNewTask, ...prev]);
+      setErrorMsg("");
+    };
+
     if (backendOnline) {
       try {
         const response = await fetch(API_BASE_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(fullTaskData)
+          body: JSON.stringify(fullTaskData),
         });
         if (response.ok) {
           const result = await response.json();
-          setTasks((prev) => [result.task, ...prev]);
+          setTasks((prev) => [normalizeTask(result.task), ...prev]);
+          setErrorMsg("");
         } else {
           throw new Error("Failed to add task to backend");
         }
       } catch (error) {
         console.error("Error adding task:", error);
-        setErrorMsg("Failed to sync new task with backend API.");
+        setBackendOnline(false);
+        setErrorMsg("Backend unavailable — task saved locally.");
+        addTaskLocally();
       }
     } else {
-      // Local addition
-      const localNewTask = {
-        ...fullTaskData,
-        task_id: Date.now(), // temporary id
-        completed: false,
-        created_at: new Date().toISOString()
-      };
-      setTasks((prev) => [localNewTask, ...prev]);
+      addTaskLocally();
     }
   };
 
   // Toggle complete handler
   const handleToggleComplete = async (task) => {
-    const updatedStatus = !task.completed;
-    
+    const updatedStatus = !Boolean(task.completed);
+
+    const toggleLocally = () => {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.task_id === task.task_id ? { ...t, completed: updatedStatus } : t
+        )
+      );
+      setErrorMsg("");
+    };
+
     if (backendOnline) {
       try {
         const response = await fetch(`${API_BASE_URL}/${task.task_id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ completed: updatedStatus })
+          body: JSON.stringify({ completed: updatedStatus }),
         });
         if (response.ok) {
           const result = await response.json();
           setTasks((prev) =>
-            prev.map((t) => (t.task_id === task.task_id ? result.task : t))
+            prev.map((t) =>
+              t.task_id === task.task_id ? normalizeTask(result.task) : t
+            )
           );
+          setErrorMsg("");
         } else {
           throw new Error("Failed to update status on backend");
         }
       } catch (error) {
         console.error("Error toggling task completion:", error);
-        setErrorMsg("Failed to update task status on backend API.");
+        setBackendOnline(false);
+        setErrorMsg("Backend unavailable — change saved locally.");
+        toggleLocally();
       }
     } else {
-      // Local toggle
-      setTasks((prev) =>
-        prev.map((t) => (t.task_id === task.task_id ? { ...t, completed: updatedStatus } : t))
-      );
+      toggleLocally();
     }
   };
 
   // Delete Task handler
   const handleDeleteTask = async (taskId) => {
+    const deleteLocally = () => {
+      setTasks((prev) => prev.filter((t) => t.task_id !== taskId));
+      setErrorMsg("");
+    };
+
     if (backendOnline) {
       try {
         const response = await fetch(`${API_BASE_URL}/${taskId}`, {
-          method: "DELETE"
+          method: "DELETE",
         });
         if (response.ok) {
-          setTasks((prev) => prev.filter((t) => t.task_id !== taskId));
+          deleteLocally();
         } else {
           throw new Error("Failed to delete task from backend");
         }
       } catch (error) {
         console.error("Error deleting task:", error);
-        setErrorMsg("Failed to delete task from backend API.");
+        setBackendOnline(false);
+        setErrorMsg("Backend unavailable — task removed locally.");
+        deleteLocally();
       }
     } else {
-      // Local delete
-      setTasks((prev) => prev.filter((t) => t.task_id !== taskId));
+      deleteLocally();
     }
   };
 
@@ -182,14 +211,17 @@ function TaskManager() {
     return tasks.filter((task) => {
       // Search query filter
       const matchesSearch =
+        !searchQuery.trim() ||
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (task.description && task.description.toLowerCase().includes(searchQuery.toLowerCase()));
+        (task.description &&
+          task.description.toLowerCase().includes(searchQuery.toLowerCase()));
 
       // Status filter
+      const isCompleted = Boolean(task.completed);
       const matchesStatus =
         filterStatus === "all" ||
-        (filterStatus === "completed" && task.completed) ||
-        (filterStatus === "active" && !task.completed);
+        (filterStatus === "completed" && isCompleted) ||
+        (filterStatus === "active" && !isCompleted);
 
       // Priority filter
       const matchesPriority =
@@ -202,7 +234,7 @@ function TaskManager() {
   // Compute stats
   const stats = useMemo(() => {
     const total = tasks.length;
-    const completed = tasks.filter((t) => t.completed).length;
+    const completed = tasks.filter((t) => Boolean(t.completed)).length;
     const pending = total - completed;
     const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -210,7 +242,7 @@ function TaskManager() {
   }, [tasks]);
 
   return (
-    <DashboardLayout>
+    <DashboardLayout variant="dark">
       {/* Background Neon Glow Rings */}
       <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-purple-500/10 rounded-full blur-[120px] pointer-events-none -z-10"></div>
       <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-500/5 rounded-full blur-[150px] pointer-events-none -z-10"></div>

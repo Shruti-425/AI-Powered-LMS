@@ -10,7 +10,7 @@ import MyCourses from "../pages/student/MyCourses";
 import StudentAssignments from "../pages/student/Assignments";
 import StudentQuizzes from "../pages/student/Quizzes";
 import StudentAttendance from "../pages/student/Attendance";
-import AiTutor from "../pages/student/AiTutor";
+import AiTutor from "../pages/student/AITutor";
 import TaskManager from "../pages/student/TaskManager";
 
 // Faculty Pages

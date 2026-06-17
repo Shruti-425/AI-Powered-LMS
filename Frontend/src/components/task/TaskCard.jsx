@@ -1,7 +1,8 @@
 import { FiCalendar, FiTrash2, FiCheck, FiBookmark } from "react-icons/fi";
 
 function TaskCard({ task, onToggleComplete, onDelete }) {
-  const { task_id, title, description, due_date, priority, category, completed } = task;
+  const { task_id, title, description, due_date, priority, category, completed: rawCompleted } = task;
+  const completed = Boolean(rawCompleted);
 
   // Format date nicely
   const formatDate = (dateStr) => {
