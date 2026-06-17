@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { FiClipboard } from "react-icons/fi";
 
 function Sidebar() {
   return (
@@ -69,8 +70,9 @@ function Sidebar() {
         <li>
           <Link
             to="/student/tasks"
-            className="block p-3 rounded hover:bg-slate-700"
+            className="flex items-center gap-2 p-3 rounded hover:bg-slate-700"
           >
+            <FiClipboard className="h-4 w-4 text-fuchsia-400" />
             Task Manager
           </Link>
         </li>

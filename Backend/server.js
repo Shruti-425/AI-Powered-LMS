@@ -20,6 +20,21 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the AI-Powered LMS backend API!' });
 });
 
+// Database health check
+app.get('/api/health', async (req, res) => {
+  const db = require('./config/db.config');
+  try {
+    await db.query('SELECT 1');
+    res.json({ status: 'ok', database: 'connected' });
+  } catch (error) {
+    res.status(503).json({
+      status: 'degraded',
+      database: 'disconnected',
+      error: error.message,
+    });
+  }
+});
+
 // Register task routes
 const taskRoutes = require('./routes/task.routes');
 app.use('/api/tasks', taskRoutes);
