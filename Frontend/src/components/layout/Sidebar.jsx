@@ -66,6 +66,15 @@ function Sidebar() {
           </Link>
         </li>
 
+        <li>
+          <Link
+            to="/student/tasks"
+            className="block p-3 rounded hover:bg-slate-700"
+          >
+            Task Manager
+          </Link>
+        </li>
+
       </ul>
     </aside>
   );

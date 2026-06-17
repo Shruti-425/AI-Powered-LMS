@@ -11,6 +11,7 @@ import StudentAssignments from "../pages/student/Assignments";
 import StudentQuizzes from "../pages/student/Quizzes";
 import StudentAttendance from "../pages/student/Attendance";
 import AiTutor from "../pages/student/AiTutor";
+import TaskManager from "../pages/student/TaskManager";
 
 // Faculty Pages
 import FacultyDashboard from "../pages/faculty/Dashboard";
@@ -60,6 +61,10 @@ function AppRoutes() {
       <Route
         path="/student/ai"
         element={<AiTutor />}
+      />
+      <Route
+        path="/student/tasks"
+        element={<TaskManager />}
       />
 
       {/* Faculty Routes */}
