@@ -1,60 +1,39 @@
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { getQuiz, getQuizzes, submitQuiz } from "../../services/quizService";
 
-const STUDENT_ID = 5;
-const fallbackQuizzes = [
-  {
-    quiz_id: "sample-dbms",
-    title: "DBMS Quiz",
-    code: "CS302",
-    duration: 30,
-    total_questions: 3
-  },
-  {
-    quiz_id: "sample-cloud",
-    title: "Cloud Computing Quiz",
-    code: "CS401",
-    duration: 20,
-    total_questions: 2
-  }
-];
-
 function Quizzes() {
+  const { user } = useAuth();
+  const studentId = user?.user_id;
   const [quizzes, setQuizzes] = useState([]);
   const [activeQuiz, setActiveQuiz] = useState(null);
   const [answers, setAnswers] = useState({});
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const loadQuizzes = () => {
+    if (!studentId) return Promise.resolve([]);
+    return getQuizzes({ studentId });
+  };
+
   useEffect(() => {
-    getQuizzes({ studentId: STUDENT_ID })
-      .then(async (data) => {
-        if (data.length > 0) {
-          setQuizzes(data);
-          return;
-        }
-
-        const allQuizzes = await getQuizzes();
-        setQuizzes(allQuizzes);
-      })
-      .catch((error) => {
-        setMessage(`${error.message}. Showing sample quizzes until the backend is running.`);
-        setQuizzes(fallbackQuizzes);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  const startQuiz = async (quizId) => {
-    if (String(quizId).startsWith("sample-")) {
-      setMessage("Start the backend and import the quiz database migration to solve this quiz.");
+    if (!studentId) {
+      setLoading(false);
       return;
     }
 
+    loadQuizzes()
+      .then(setQuizzes)
+      .catch((error) => setMessage(error.message))
+      .finally(() => setLoading(false));
+  }, [studentId]);
+
+  const startQuiz = async (quizId) => {
     setMessage("");
     setAnswers({});
     try {
-      const quiz = await getQuiz(quizId);
+      const quiz = await getQuiz(quizId, false, true);
       setActiveQuiz(quiz);
     } catch (error) {
       setMessage(error.message);
@@ -64,12 +43,12 @@ function Quizzes() {
   const submitActiveQuiz = async () => {
     try {
       const result = await submitQuiz(activeQuiz.quiz_id, {
-        student_id: STUDENT_ID,
-        answers
+        student_id: studentId,
+        answers,
       });
       setMessage(`Quiz submitted. Marks: ${result.marks}`);
       setActiveQuiz(null);
-      setQuizzes(await getQuizzes({ studentId: STUDENT_ID }));
+      setQuizzes(await loadQuizzes());
     } catch (error) {
       setMessage(error.message);
     }
@@ -77,15 +56,10 @@ function Quizzes() {
 
   return (
     <DashboardLayout>
-
-      <h1 className="text-3xl font-bold mb-6">
-        Quizzes
-      </h1>
+      <h1 className="text-3xl font-bold mb-6">Quizzes</h1>
 
       {message && (
-        <div className="mb-4 rounded bg-blue-50 px-4 py-3 text-blue-700">
-          {message}
-        </div>
+        <div className="mb-4 rounded bg-blue-50 px-4 py-3 text-blue-700">{message}</div>
       )}
 
       {activeQuiz ? (
@@ -144,49 +118,41 @@ function Quizzes() {
         </div>
       ) : (
         <>
-        {loading && (
-          <div className="bg-white p-5 rounded-xl shadow text-gray-600">
-            Loading quizzes...
-          </div>
-        )}
+          {loading && (
+            <div className="bg-white p-5 rounded-xl shadow text-gray-600">Loading quizzes...</div>
+          )}
 
-        {!loading && quizzes.length === 0 && (
-          <div className="bg-white p-5 rounded-xl shadow text-gray-600">
-            No quizzes are available yet.
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-2 gap-6">
-
-          {quizzes.map((quiz) => (
-            <div key={quiz.quiz_id} className="bg-white shadow rounded-xl p-6">
-              <h2 className="font-semibold">
-                {quiz.title}
-              </h2>
-
-              <p className="text-gray-500">
-                {quiz.code} · Duration: {quiz.duration} Minutes
-              </p>
-
-              {quiz.response_id ? (
-                <p className="mt-4 text-green-700 font-medium">
-                  Submitted · Marks: {quiz.marks}
-                </p>
-              ) : (
-                <button
-                  onClick={() => startQuiz(quiz.quiz_id)}
-                  className="mt-4 bg-green-600 text-white px-4 py-2 rounded"
-                >
-                  Start Quiz
-                </button>
-              )}
+          {!loading && quizzes.length === 0 && (
+            <div className="bg-white p-5 rounded-xl shadow text-gray-600">
+              No published quizzes are available yet.
             </div>
-          ))}
+          )}
 
-        </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            {quizzes.map((quiz) => (
+              <div key={quiz.quiz_id} className="bg-white shadow rounded-xl p-6">
+                <h2 className="font-semibold">{quiz.title}</h2>
+                <p className="text-gray-500">
+                  {quiz.code} · Duration: {quiz.duration} Minutes
+                </p>
+
+                {quiz.response_id ? (
+                  <p className="mt-4 text-green-700 font-medium">
+                    Submitted · Marks: {quiz.marks}
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => startQuiz(quiz.quiz_id)}
+                    className="mt-4 bg-green-600 text-white px-4 py-2 rounded"
+                  >
+                    Start Quiz
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </>
       )}
-
     </DashboardLayout>
   );
 }
