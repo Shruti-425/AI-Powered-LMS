@@ -4,30 +4,25 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from "recharts";
 
-const data = [
-  { month: "Jan", attendance: 85 },
-  { month: "Feb", attendance: 90 },
-  { month: "Mar", attendance: 88 },
-  { month: "Apr", attendance: 95 }
-];
+function AttendanceChart({ data = [] }) {
+  if (!data.length) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-slate-500 text-sm">
+        No attendance chart data yet.
+      </div>
+    );
+  }
 
-function AttendanceChart() {
   return (
-    <ResponsiveContainer
-      width="100%"
-      height={300}
-    >
+    <ResponsiveContainer width="100%" height={300}>
       <LineChart data={data}>
-        <XAxis dataKey="month" />
-        <YAxis />
+        <XAxis dataKey="label" />
+        <YAxis domain={[0, 100]} />
         <Tooltip />
-        <Line
-          type="monotone"
-          dataKey="attendance"
-        />
+        <Line type="monotone" dataKey="attendance" stroke="#2563eb" strokeWidth={2} />
       </LineChart>
     </ResponsiveContainer>
   );
