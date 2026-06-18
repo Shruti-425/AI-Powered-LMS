@@ -56,6 +56,9 @@ app.use('/api/assignments', assignmentRoutes);
 const authRoutes = require('./routes/auth.routes');
 app.use('/api/auth', authRoutes);
 
+const dashboardRoutes = require('./routes/dashboard.routes');
+app.use('/api/dashboard', dashboardRoutes);
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
