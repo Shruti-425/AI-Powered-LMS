@@ -167,3 +167,36 @@ exports.getStudentDashboard = async (req, res) => {
     });
   }
 };
+
+exports.getStudentCourses = async (req, res) => {
+  const studentId = req.user.user_id;
+
+  try {
+    const [courses] = await db.query(
+      `SELECT
+         c.course_id,
+         c.course_name,
+         c.code,
+         u.name AS instructor_name,
+         COALESCE(ROUND(
+           (SELECT COUNT(*) FROM quiz_responses qr
+            INNER JOIN quizzes q ON q.quiz_id = qr.quiz_id
+            WHERE q.course_id = c.course_id AND qr.student_id = e.student_id) * 100.0
+           / NULLIF((SELECT COUNT(*) FROM quizzes q
+            WHERE q.course_id = c.course_id AND q.is_published = TRUE
+              AND EXISTS (SELECT 1 FROM questions qu WHERE qu.quiz_id = q.quiz_id)), 0)
+         ), 0) AS progress
+       FROM enrollment e
+       INNER JOIN courses c ON c.course_id = e.course_id
+       INNER JOIN users u ON u.user_id = c.instructor_id
+       WHERE e.student_id = ?
+       ORDER BY c.course_name`,
+      [studentId]
+    );
+
+    res.status(200).json(courses);
+  } catch (error) {
+    console.error('Student courses error:', error);
+    res.status(500).json({ message: 'Failed to load courses', error: error.message });
+  }
+};

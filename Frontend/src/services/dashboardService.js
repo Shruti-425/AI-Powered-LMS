@@ -22,3 +22,5 @@ const request = async (url, options = {}) => {
 export const getTeacherDashboard = () => request(`${API_URL}/teacher`);
 
 export const getStudentDashboard = () => request(`${API_URL}/student`);
+
+export const getStudentCourses = () => request(`${API_URL}/student/courses`);

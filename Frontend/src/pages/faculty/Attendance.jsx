@@ -144,7 +144,9 @@ function Attendance() {
       {loading ? (
         <p className="text-slate-500">Loading classes...</p>
       ) : !selectedClassId ? (
-        <p className="text-slate-500">No classes found for this date.</p>
+        <p className="text-slate-500">
+          No classes found for this date. Pick another date or refresh — sessions are created automatically for your courses.
+        </p>
       ) : (
         <div className="bg-white rounded-xl shadow p-6">
           {classInfo && (

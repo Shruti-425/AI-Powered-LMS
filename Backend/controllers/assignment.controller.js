@@ -43,9 +43,19 @@ exports.getAssignments = async (req, res) => {
       `;
       params = [userId, userId];
     } else {
-      query += `
-        LEFT JOIN submissions s ON s.assignment_id = a.assignment_id
-        LEFT JOIN submission_files sf ON sf.submission_id = s.submission_id
+      query = `
+        SELECT 
+          a.assignment_id, 
+          a.course_id, 
+          a.title, 
+          a.description, 
+          a.due_date, 
+          a.max_marks,
+          c.course_name, 
+          c.code,
+          (SELECT COUNT(*) FROM submissions s WHERE s.assignment_id = a.assignment_id) AS submission_count
+        FROM assignments a
+        INNER JOIN courses c ON c.course_id = a.course_id
         WHERE c.instructor_id = ?
         ORDER BY a.due_date ASC
       `;
@@ -157,8 +167,12 @@ exports.submitAssignment = async (req, res) => {
       [file_name, `database:${file_name}`, file_size || fileContent.length, file_type || '', submission.submission_id]
     );
 
-    // Refresh dashboard stats
-    await connection.query(`CALL sp_refresh_dashboard_stats(?)`, [student_id]);
+    // Refresh dashboard stats (optional — don't fail submit if procedure missing)
+    try {
+      await connection.query('CALL sp_refresh_dashboard_stats(?)', [student_id]);
+    } catch (statsError) {
+      console.warn('Dashboard stats refresh skipped:', statsError.message);
+    }
 
     await connection.commit();
     res.status(201).json({ 
@@ -178,10 +192,24 @@ exports.submitAssignment = async (req, res) => {
 // GET /api/assignments/:id/submissions - Get all submissions (Faculty)
 exports.getSubmissions = async (req, res) => {
   const assignmentId = req.params.id;
+  const instructorId = req.user.user_id;
 
   try {
+    const [[assignment]] = await db.query(
+      `SELECT a.assignment_id
+       FROM assignments a
+       INNER JOIN courses c ON c.course_id = a.course_id
+       WHERE a.assignment_id = ? AND c.instructor_id = ?`,
+      [assignmentId, instructorId]
+    );
+
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found or access denied' });
+    }
+
     const [rows] = await db.query(
-      `SELECT s.*, u.name as student_name, u.email,
+      `SELECT s.submission_id, s.student_id, s.submitted_at, s.marks_obtained,
+              u.name AS student_name, u.email,
               sf.file_name, sf.file_size, sf.file_type
        FROM submissions s
        JOIN users u ON u.user_id = s.student_id
@@ -197,7 +225,67 @@ exports.getSubmissions = async (req, res) => {
   }
 };
 
-// GET /api/assignments/:id/file - Download file
+exports.updateAssignment = async (req, res) => {
+  const assignmentId = req.params.id;
+  const instructorId = req.user.user_id;
+  const { title, description, due_date, max_marks } = req.body;
+
+  try {
+    const [[assignment]] = await db.query(
+      `SELECT a.assignment_id
+       FROM assignments a
+       INNER JOIN courses c ON c.course_id = a.course_id
+       WHERE a.assignment_id = ? AND c.instructor_id = ?`,
+      [assignmentId, instructorId]
+    );
+
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found or access denied' });
+    }
+
+    await db.query(
+      `UPDATE assignments
+       SET title = COALESCE(?, title),
+           description = COALESCE(?, description),
+           due_date = COALESCE(?, due_date),
+           max_marks = COALESCE(?, max_marks)
+       WHERE assignment_id = ?`,
+      [title, description, due_date, max_marks, assignmentId]
+    );
+
+    res.status(200).json({ message: 'Assignment updated successfully' });
+  } catch (error) {
+    console.error('Error updating assignment:', error);
+    res.status(500).json({ message: 'Error updating assignment', error: error.message });
+  }
+};
+
+exports.deleteAssignment = async (req, res) => {
+  const assignmentId = req.params.id;
+  const instructorId = req.user.user_id;
+
+  try {
+    const [[assignment]] = await db.query(
+      `SELECT a.assignment_id
+       FROM assignments a
+       INNER JOIN courses c ON c.course_id = a.course_id
+       WHERE a.assignment_id = ? AND c.instructor_id = ?`,
+      [assignmentId, instructorId]
+    );
+
+    if (!assignment) {
+      return res.status(404).json({ message: 'Assignment not found or access denied' });
+    }
+
+    await db.query('DELETE FROM assignments WHERE assignment_id = ?', [assignmentId]);
+    res.status(200).json({ message: 'Assignment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting assignment:', error);
+    res.status(500).json({ message: 'Error deleting assignment', error: error.message });
+  }
+};
+
+// GET /api/assignments/file/:id - Download file
 exports.downloadFile = async (req, res) => {
   const submissionId = req.params.id;
 

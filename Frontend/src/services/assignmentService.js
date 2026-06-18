@@ -36,5 +36,14 @@ export const submitAssignment = (assignmentId, payload) =>
 export const getSubmissions = (assignmentId) =>
   request(`${API_URL}/${assignmentId}/submissions`);
 
+export const updateAssignment = (assignmentId, payload) =>
+  request(`${API_URL}/${assignmentId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+export const deleteAssignment = (assignmentId) =>
+  request(`${API_URL}/${assignmentId}`, { method: "DELETE" });
+
 export const downloadFile = (submissionId) =>
   `${API_URL}/file/${submissionId}`;

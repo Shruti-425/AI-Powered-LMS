@@ -17,4 +17,11 @@ router.get(
   dashboardController.getStudentDashboard
 );
 
+router.get(
+  '/student/courses',
+  authenticate,
+  authorize('student'),
+  dashboardController.getStudentCourses
+);
+
 module.exports = router;
