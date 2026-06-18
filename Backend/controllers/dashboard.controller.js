@@ -79,3 +79,91 @@ exports.getTeacherDashboard = async (req, res) => {
     });
   }
 };
+
+exports.getStudentDashboard = async (req, res) => {
+  const studentId = req.user.user_id;
+
+  try {
+    const [[statsRow]] = await db.query(
+      `SELECT enrolled_count, quiz_count, assignment_count, avg_attendance
+       FROM dashboard_stats
+       WHERE student_id = ?`,
+      [studentId]
+    );
+
+    const [[upcomingTests]] = await db.query(
+      `SELECT COUNT(*) AS upcoming_tests
+       FROM quizzes q
+       INNER JOIN enrollment e ON e.course_id = q.course_id AND e.student_id = ?
+       LEFT JOIN quiz_responses qr ON qr.quiz_id = q.quiz_id AND qr.student_id = ?
+       WHERE qr.response_id IS NULL`,
+      [studentId, studentId]
+    );
+
+    const [[completedTests]] = await db.query(
+      `SELECT COUNT(*) AS completed_tests
+       FROM quiz_responses
+       WHERE student_id = ?`,
+      [studentId]
+    );
+
+    const [[scoreRow]] = await db.query(
+      `SELECT ROUND(AVG(marks), 1) AS average_score
+       FROM quiz_responses
+       WHERE student_id = ?`,
+      [studentId]
+    );
+
+    const [recentAssignments] = await db.query(
+      `SELECT a.title, a.due_date, c.code AS course_code, c.course_name
+       FROM assignments a
+       INNER JOIN enrollment e ON e.course_id = a.course_id
+       INNER JOIN courses c ON c.course_id = a.course_id
+       WHERE e.student_id = ?
+       ORDER BY a.due_date ASC
+       LIMIT 5`,
+      [studentId]
+    );
+
+    const [upcomingClasses] = await db.query(
+      `SELECT c.course_name, c.code AS course_code, cl.time, cl.room
+       FROM classes cl
+       INNER JOIN courses c ON c.course_id = cl.course_id
+       INNER JOIN enrollment e ON e.course_id = c.course_id
+       WHERE e.student_id = ? AND cl.class_date = CURRENT_DATE
+       ORDER BY cl.time
+       LIMIT 5`,
+      [studentId]
+    );
+
+    const [recentQuizResults] = await db.query(
+      `SELECT q.title, qr.marks, q.total_marks, qr.attempted_at
+       FROM quiz_responses qr
+       INNER JOIN quizzes q ON q.quiz_id = qr.quiz_id
+       WHERE qr.student_id = ?
+       ORDER BY qr.attempted_at DESC
+       LIMIT 5`,
+      [studentId]
+    );
+
+    res.status(200).json({
+      stats: {
+        enrolledCourses: Number(statsRow?.enrolled_count || 0),
+        assignments: Number(statsRow?.assignment_count || 0),
+        attendancePercent: Number(statsRow?.avg_attendance || 0),
+        upcomingTests: Number(upcomingTests?.upcoming_tests || 0),
+        completedTests: Number(completedTests?.completed_tests || 0),
+        averageScore: Number(scoreRow?.average_score || 0),
+      },
+      recentAssignments,
+      upcomingClasses,
+      recentQuizResults,
+    });
+  } catch (error) {
+    console.error('Student dashboard error:', error);
+    res.status(500).json({
+      message: 'Failed to load student dashboard',
+      error: error.message,
+    });
+  }
+};

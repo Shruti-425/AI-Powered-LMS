@@ -10,4 +10,11 @@ router.get(
   dashboardController.getTeacherDashboard
 );
 
+router.get(
+  '/student',
+  authenticate,
+  authorize('student'),
+  dashboardController.getStudentDashboard
+);
+
 module.exports = router;
