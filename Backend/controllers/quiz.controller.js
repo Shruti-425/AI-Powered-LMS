@@ -77,7 +77,8 @@ exports.getQuizzes = async (req, res) => {
         INNER JOIN enrollment e ON e.course_id = q.course_id AND e.student_id = ?
         LEFT JOIN quiz_responses qr ON qr.quiz_id = q.quiz_id AND qr.student_id = ?
         WHERE q.is_published = TRUE
-        ORDER BY q.quiz_id DESC
+          AND EXISTS (SELECT 1 FROM questions qu WHERE qu.quiz_id = q.quiz_id)
+        ORDER BY q.quiz_id ASC
       `;
       params = [studentId, studentId];
     } else if (instructorId) {
@@ -95,7 +96,18 @@ exports.getQuizzes = async (req, res) => {
     }
 
     const [quizzes] = await db.query(query, params);
-    res.status(200).json(quizzes);
+
+    const withCounts = await Promise.all(
+      quizzes.map(async (quiz) => {
+        const [[row]] = await db.query(
+          'SELECT COUNT(*) AS total_questions FROM questions WHERE quiz_id = ?',
+          [quiz.quiz_id]
+        );
+        return { ...quiz, total_questions: Number(row?.total_questions || 0) };
+      })
+    );
+
+    res.status(200).json(withCounts);
     
   } catch (error) {
     console.error('Error retrieving quizzes:', error);
@@ -131,6 +143,10 @@ exports.getQuiz = async (req, res) => {
        ORDER BY question_id`,
       [req.params.id]
     );
+
+    if (questions.length === 0) {
+      return res.status(404).json({ message: 'This quiz has no questions yet' });
+    }
 
     quiz.questions = questions.map((question) => {
       const mapped = {
@@ -402,7 +418,11 @@ exports.submitQuiz = async (req, res) => {
     }
 
     // Refresh dashboard stats
-    await connection.query(`CALL sp_refresh_dashboard_stats(?)`, [student_id]);
+    try {
+      await connection.query('CALL sp_refresh_dashboard_stats(?)', [student_id]);
+    } catch (statsError) {
+      console.warn('Dashboard stats refresh skipped:', statsError.message);
+    }
 
     await connection.commit();
     

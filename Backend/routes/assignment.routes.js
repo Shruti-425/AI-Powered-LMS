@@ -31,6 +31,20 @@ router.get(
   assignmentController.getSubmissions
 );
 
+router.put(
+  '/:id',
+  authenticate,
+  authorize('instructor'),
+  assignmentController.updateAssignment
+);
+
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('instructor'),
+  assignmentController.deleteAssignment
+);
+
 router.get('/file/:id', authenticate, assignmentController.downloadFile);
 
 module.exports = router;
