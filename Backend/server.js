@@ -62,6 +62,9 @@ app.use('/api/dashboard', dashboardRoutes);
 const attendanceRoutes = require('./routes/attendance.routes');
 app.use('/api/attendance', attendanceRoutes);
 
+const adminRoutes = require('./routes/admin.routes');
+app.use('/api/admin', adminRoutes);
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
