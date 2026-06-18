@@ -1,19 +1,19 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "../components/auth/ProtectedRoute";
 
-// Auth Pages
 import Login from "../pages/auth/Login";
 import Register from "../pages/auth/Register";
+import ForgotPassword from "../pages/auth/ForgotPassword";
+import ResetPassword from "../pages/auth/ResetPassword";
 
-// Student Pages
 import StudentDashboard from "../pages/student/Dashboard";
 import MyCourses from "../pages/student/MyCourses";
 import StudentAssignments from "../pages/student/Assignments";
 import StudentQuizzes from "../pages/student/Quizzes";
 import StudentAttendance from "../pages/student/Attendance";
-import AiTutor from "../pages/student/AiTutor";
+import AiTutor from "../pages/student/AITutor";
 import TaskManager from "../pages/student/TaskManager";
 
-// Faculty Pages
 import FacultyDashboard from "../pages/faculty/Dashboard";
 import Courses from "../pages/faculty/Courses";
 import CreateCourse from "../pages/faculty/CreateCourse";
@@ -22,7 +22,6 @@ import FacultyQuizzes from "../pages/faculty/Quizzes";
 import FacultyAttendance from "../pages/faculty/Attendance";
 import AiTools from "../pages/faculty/AiTools";
 
-// Super Admin Pages
 import AdminDashboard from "../pages/superadmin/Dashboard";
 import ManageFaculty from "../pages/superadmin/ManageFaculty";
 import ManageStudents from "../pages/superadmin/ManageStudents";
@@ -30,7 +29,6 @@ import ManageCourses from "../pages/superadmin/ManageCourses";
 import Reports from "../pages/superadmin/Reports";
 import Analytics from "../pages/superadmin/Analytics";
 
-// Shared Pages
 import Profile from "../pages/shared/Profile";
 import Settings from "../pages/shared/Settings";
 import Notifications from "../pages/shared/Notifications";
@@ -38,40 +36,200 @@ import Notifications from "../pages/shared/Notifications";
 function AppRoutes() {
   return (
     <Routes>
-      {/* Authentication */}
       <Route path="/" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* Student Routes */}
-      <Route path="/student" element={<StudentDashboard />} />
-      <Route path="/student/courses" element={<MyCourses />} />
-      <Route path="/student/assignments" element={<StudentAssignments />} />
-      <Route path="/student/quizzes" element={<StudentQuizzes />} />
-      <Route path="/student/attendance" element={<StudentAttendance />} />
-      <Route path="/student/ai" element={<AiTutor />} />
-      <Route path="/student/tasks" element={<TaskManager />} />
+      <Route
+        path="/student"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <StudentDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/courses"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <MyCourses />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/assignments"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <StudentAssignments />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/quizzes"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <StudentQuizzes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/attendance"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <StudentAttendance />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/ai"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <AiTutor />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/tasks"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <TaskManager />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* Faculty Routes */}
-      <Route path="/faculty" element={<FacultyDashboard />} />
-      <Route path="/faculty/courses" element={<Courses />} />
-      <Route path="/faculty/create-course" element={<CreateCourse />} />
-      <Route path="/faculty/assignments" element={<FacultyAssignments />} />
-      <Route path="/faculty/quizzes" element={<FacultyQuizzes />} />
-      <Route path="/faculty/attendance" element={<FacultyAttendance />} />
-      <Route path="/faculty/ai-tools" element={<AiTools />} />
+      <Route
+        path="/faculty"
+        element={
+          <ProtectedRoute allowedRoles={["instructor"]}>
+            <FacultyDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/faculty/courses"
+        element={
+          <ProtectedRoute allowedRoles={["instructor"]}>
+            <Courses />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/faculty/create-course"
+        element={
+          <ProtectedRoute allowedRoles={["instructor"]}>
+            <CreateCourse />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/faculty/assignments"
+        element={
+          <ProtectedRoute allowedRoles={["instructor"]}>
+            <FacultyAssignments />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/faculty/quizzes"
+        element={
+          <ProtectedRoute allowedRoles={["instructor"]}>
+            <FacultyQuizzes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/faculty/attendance"
+        element={
+          <ProtectedRoute allowedRoles={["instructor"]}>
+            <FacultyAttendance />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/faculty/ai-tools"
+        element={
+          <ProtectedRoute allowedRoles={["instructor"]}>
+            <AiTools />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* Super Admin Routes */}
-      <Route path="/superadmin" element={<AdminDashboard />} />
-      <Route path="/superadmin/faculty" element={<ManageFaculty />} />
-      <Route path="/superadmin/students" element={<ManageStudents />} />
-      <Route path="/superadmin/courses" element={<ManageCourses />} />
-      <Route path="/superadmin/reports" element={<Reports />} />
-      <Route path="/superadmin/analytics" element={<Analytics />} />
+      <Route
+        path="/superadmin"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/faculty"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <ManageFaculty />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/students"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <ManageStudents />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/courses"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <ManageCourses />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/reports"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <Reports />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/superadmin/analytics"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <Analytics />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* Shared Routes */}
-      <Route path="/profile" element={<Profile />} />
-      <Route path="/settings" element={<Settings />} />
-      <Route path="/notifications" element={<Notifications />} />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute allowedRoles={["student", "instructor", "admin"]}>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute allowedRoles={["student", "instructor", "admin"]}>
+            <Settings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute allowedRoles={["student", "instructor", "admin"]}>
+            <Notifications />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

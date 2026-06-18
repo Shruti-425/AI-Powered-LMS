@@ -53,6 +53,9 @@ app.use('/api/quizzes', quizRoutes);
 const assignmentRoutes = require('./routes/assignment.routes');
 app.use('/api/assignments', assignmentRoutes);
 
+const authRoutes = require('./routes/auth.routes');
+app.use('/api/auth', authRoutes);
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
