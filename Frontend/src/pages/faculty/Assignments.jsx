@@ -1,31 +1,29 @@
 import DashboardLayout from "../../components/layout/DashboardLayout";
 import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { createAssignment, getAssignments } from "../../services/assignmentService";
 import { getCourses } from "../../services/quizService";
 
-const fallbackCourses = [
-  { course_id: 1, code: "CS301", course_name: "Data Structures & Algorithms" },
-  { course_id: 2, code: "CS302", course_name: "Database Management Systems" },
-  { course_id: 3, code: "CS401", course_name: "Cloud Computing" }
-];
-
 function Assignments() {
+  const { user } = useAuth();
   const [courses, setCourses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({
     course_id: "",
     title: "",
     description: "",
     due_date: "",
-    max_marks: 100
+    max_marks: 100,
   });
 
   const loadData = async () => {
+    const instructorId = user?.user_id;
     const [courseData, assignmentData] = await Promise.all([
-      getCourses(),
-      getAssignments()
+      getCourses(instructorId ? { instructorId } : {}),
+      getAssignments(),
     ]);
     setCourses(courseData);
     setAssignments(assignmentData);
@@ -35,36 +33,37 @@ function Assignments() {
   };
 
   useEffect(() => {
+    if (!user?.user_id) {
+      setLoading(false);
+      return;
+    }
+
     loadData()
-      .catch((error) => {
-        setMessage(`${error.message}. The form is still visible; start the backend to save to database.`);
-        setCourses(fallbackCourses);
-        setForm((current) => ({ ...current, course_id: current.course_id || fallbackCourses[0].course_id }));
-      })
+      .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.user_id]);
 
   const submitForm = async (event) => {
     event.preventDefault();
+    setMessage("");
+    setError("");
     try {
       await createAssignment(form);
       setMessage("Assignment uploaded successfully.");
       setForm((current) => ({ ...current, title: "", description: "", due_date: "" }));
       await loadData();
-    } catch (error) {
-      setMessage(error.message);
+    } catch (err) {
+      setError(err.message);
     }
   };
 
   return (
     <DashboardLayout>
-      <h1 className="text-3xl font-bold mb-6">Create Assignment</h1>
+      <h1 className="text-3xl font-bold mb-2">Create Assignment</h1>
+      <p className="text-slate-500 mb-6">Upload assignments for your courses</p>
 
-      {message && (
-        <div className="mb-4 rounded bg-blue-50 px-4 py-3 text-blue-700">
-          {message}
-        </div>
-      )}
+      {message && <div className="mb-4 rounded bg-green-50 px-4 py-3 text-green-700">{message}</div>}
+      {error && <div className="mb-4 rounded bg-red-50 px-4 py-3 text-red-700">{error}</div>}
 
       <form onSubmit={submitForm} className="bg-white rounded-xl shadow p-6 space-y-4 mb-8">
         <div className="grid md:grid-cols-2 gap-4">
@@ -72,7 +71,9 @@ function Assignments() {
             className="border rounded px-3 py-2"
             value={form.course_id}
             onChange={(event) => setForm({ ...form, course_id: event.target.value })}
+            required
           >
+            {courses.length === 0 && <option value="">No courses assigned</option>}
             {courses.map((course) => (
               <option key={course.course_id} value={course.course_id}>
                 {course.code} - {course.course_name}
@@ -114,22 +115,22 @@ function Assignments() {
           />
         </div>
 
-        <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded">
+        <button
+          type="submit"
+          disabled={courses.length === 0}
+          className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        >
           Upload Assignment
         </button>
       </form>
 
       <div className="space-y-4">
         {loading && (
-          <div className="bg-white p-5 rounded-xl shadow text-gray-600">
-            Loading saved assignments...
-          </div>
+          <div className="bg-white p-5 rounded-xl shadow text-gray-600">Loading saved assignments...</div>
         )}
 
         {!loading && assignments.length === 0 && (
-          <div className="bg-white p-5 rounded-xl shadow text-gray-600">
-            No uploaded assignments found yet.
-          </div>
+          <div className="bg-white p-5 rounded-xl shadow text-gray-600">No uploaded assignments found yet.</div>
         )}
 
         {assignments.map((assignment) => (

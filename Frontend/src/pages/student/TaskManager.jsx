@@ -3,10 +3,9 @@ import DashboardLayout from "../../components/layout/DashboardLayout";
 import SearchBar from "../../components/task/SearchBar";
 import TaskForm from "../../components/task/TaskForm";
 import TaskCard from "../../components/task/TaskCard";
+import { useAuth } from "../../context/AuthContext";
+import { createTask, deleteTask, getTasks, updateTask } from "../../services/taskService";
 import { FiCheckCircle, FiClock, FiActivity, FiFilter } from "react-icons/fi";
-
-const API_BASE_URL = "http://localhost:5000/api/tasks";
-const DEFAULT_USER_ID = 5; // Matches the student user seeded in 09_tasks_schema.sql
 
 const normalizeTask = (task) => ({
   ...task,
@@ -14,6 +13,8 @@ const normalizeTask = (task) => ({
 });
 
 function TaskManager() {
+  const { user } = useAuth();
+  const userId = user?.user_id;
   const [tasks, setTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all"); // 'all' | 'active' | 'completed'
@@ -22,89 +23,44 @@ function TaskManager() {
   const [backendOnline, setBackendOnline] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Fetch tasks on mount
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    if (userId) fetchTasks();
+  }, [userId]);
 
   const fetchTasks = async () => {
+    if (!userId) return;
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}?userId=${DEFAULT_USER_ID}`);
-      if (response.ok) {
-        const data = await response.json();
-        const normalizedData = data.map(normalizeTask);
-        setTasks(normalizedData);
-        setBackendOnline(true);
-        setErrorMsg("");
-      } else {
-        throw new Error("Failed to fetch from backend");
-      }
+      const data = await getTasks();
+      setTasks(data.map(normalizeTask));
+      setBackendOnline(true);
+      setErrorMsg("");
     } catch (error) {
       console.warn("Backend API offline, falling back to localStorage", error);
       setBackendOnline(false);
-      
-      // LocalStorage Fallback
-      const localTasks = localStorage.getItem(`tasks_user_${DEFAULT_USER_ID}`);
+
+      const localTasks = localStorage.getItem(`tasks_user_${userId}`);
       if (localTasks) {
-        const parsedTasks = JSON.parse(localTasks);
-        setTasks(parsedTasks.map(normalizeTask));
+        setTasks(JSON.parse(localTasks).map(normalizeTask));
       } else {
-        // Default seed tasks if no local storage
-        const defaultTasks = [
-          {
-            task_id: 1,
-            user_id: DEFAULT_USER_ID,
-            title: "Review Database ER Diagram",
-            description: "Review the database relationships and constraints for the upcoming LMS milestone.",
-            due_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-            priority: "high",
-            category: "Study",
-            completed: false
-          },
-          {
-            task_id: 2,
-            user_id: DEFAULT_USER_ID,
-            title: "Prepare Cloud Quiz",
-            description: "Study AWS EC2 and S3 documentation for Cloud Computing quiz.",
-            due_date: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
-            priority: "medium",
-            category: "Exam",
-            completed: false
-          },
-          {
-            task_id: 3,
-            user_id: DEFAULT_USER_ID,
-            title: "Complete React Tutorial",
-            description: "Finish reading documentation for React Router and Context API.",
-            due_date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-            priority: "low",
-            category: "Personal",
-            completed: true
-          }
-        ];
-        setTasks(defaultTasks.map(normalizeTask));
-        localStorage.setItem(`tasks_user_${DEFAULT_USER_ID}`, JSON.stringify(defaultTasks));
+        setTasks([]);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Sync to localStorage when tasks change (only if backend is offline)
   useEffect(() => {
-    if (!backendOnline && tasks.length > 0) {
-      localStorage.setItem(`tasks_user_${DEFAULT_USER_ID}`, JSON.stringify(tasks));
+    if (!backendOnline && userId && tasks.length > 0) {
+      localStorage.setItem(`tasks_user_${userId}`, JSON.stringify(tasks));
     }
-  }, [tasks, backendOnline]);
+  }, [tasks, backendOnline, userId]);
 
-  // Add Task handler
   const handleAddTask = async (newTaskData) => {
-    const fullTaskData = { ...newTaskData, user_id: DEFAULT_USER_ID };
-
     const addTaskLocally = () => {
       const localNewTask = normalizeTask({
-        ...fullTaskData,
+        ...newTaskData,
+        user_id: userId,
         task_id: Date.now(),
         completed: false,
         created_at: new Date().toISOString(),
@@ -115,18 +71,9 @@ function TaskManager() {
 
     if (backendOnline) {
       try {
-        const response = await fetch(API_BASE_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(fullTaskData)
-        });
-        if (response.ok) {
-          const result = await response.json();
-          setTasks((prev) => [normalizeTask(result.task), ...prev]);
-          setErrorMsg("");
-        } else {
-          throw new Error("Failed to add task to backend");
-        }
+        const result = await createTask(newTaskData);
+        setTasks((prev) => [normalizeTask(result.task), ...prev]);
+        setErrorMsg("");
       } catch (error) {
         console.error("Error adding task:", error);
         setBackendOnline(false);
@@ -138,7 +85,6 @@ function TaskManager() {
     }
   };
 
-  // Toggle complete handler
   const handleToggleComplete = async (task) => {
     const updatedStatus = !Boolean(task.completed);
 
@@ -153,22 +99,11 @@ function TaskManager() {
 
     if (backendOnline) {
       try {
-        const response = await fetch(`${API_BASE_URL}/${task.task_id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ completed: updatedStatus }),
-        });
-        if (response.ok) {
-          const result = await response.json();
-          setTasks((prev) =>
-            prev.map((t) =>
-              t.task_id === task.task_id ? normalizeTask(result.task) : t
-            )
-          );
-          setErrorMsg("");
-        } else {
-          throw new Error("Failed to update status on backend");
-        }
+        const result = await updateTask(task.task_id, { completed: updatedStatus });
+        setTasks((prev) =>
+          prev.map((t) => (t.task_id === task.task_id ? normalizeTask(result.task) : t))
+        );
+        setErrorMsg("");
       } catch (error) {
         console.error("Error toggling task completion:", error);
         setBackendOnline(false);
@@ -180,7 +115,6 @@ function TaskManager() {
     }
   };
 
-  // Delete Task handler
   const handleDeleteTask = async (taskId) => {
     const deleteLocally = () => {
       setTasks((prev) => prev.filter((t) => t.task_id !== taskId));
@@ -189,14 +123,8 @@ function TaskManager() {
 
     if (backendOnline) {
       try {
-        const response = await fetch(`${API_BASE_URL}/${taskId}`, {
-          method: "DELETE",
-        });
-        if (response.ok) {
-          deleteLocally();
-        } else {
-          throw new Error("Failed to delete task from backend");
-        }
+        await deleteTask(taskId);
+        deleteLocally();
       } catch (error) {
         console.error("Error deleting task:", error);
         setBackendOnline(false);

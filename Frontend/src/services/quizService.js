@@ -19,7 +19,10 @@ const request = async (url, options = {}) => {
   return data;
 };
 
-export const getCourses = () => request(`${API_URL}/courses`);
+export const getCourses = (params = {}) => {
+  const query = new URLSearchParams(params).toString();
+  return request(`${API_URL}/courses${query ? `?${query}` : ""}`);
+};
 
 export const getQuizzes = (params = {}) => {
   const query = new URLSearchParams(params).toString();

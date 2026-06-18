@@ -10,6 +10,9 @@ function Navbar() {
     navigate("/");
   };
 
+  const roleLabel =
+    user?.role === "instructor" ? "Teacher" : user?.role === "admin" ? "Admin" : "Student";
+
   return (
     <nav className="bg-white shadow px-8 py-4 flex justify-between items-center">
       <div>
@@ -17,11 +20,9 @@ function Navbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <span className="font-medium">
-          Welcome, {user?.name || "User"}
-        </span>
+        <span className="font-medium">Welcome, {user?.name || "User"}</span>
         <span className="text-xs uppercase tracking-wide bg-slate-100 px-2 py-1 rounded text-slate-600">
-          {user?.role}
+          {roleLabel}
         </span>
         <button
           onClick={handleLogout}

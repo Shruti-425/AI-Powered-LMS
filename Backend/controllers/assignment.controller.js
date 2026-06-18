@@ -6,9 +6,9 @@ const decodeFile = (fileData) => {
   return Buffer.from(base64, 'base64');
 };
 
-// GET /api/assignments - Get assignments for student or instructor
+// GET /api/assignments - Get assignments for authenticated student or instructor
 exports.getAssignments = async (req, res) => {
-  const { studentId, instructorId } = req.query;
+  const { role, user_id: userId } = req.user;
 
   try {
     let query = `
@@ -30,10 +30,10 @@ exports.getAssignments = async (req, res) => {
       FROM assignments a
       INNER JOIN courses c ON c.course_id = a.course_id
     `;
-    
+
     let params = [];
 
-    if (studentId) {
+    if (role === 'student') {
       query += `
         INNER JOIN enrollment e ON e.course_id = a.course_id AND e.student_id = ?
         LEFT JOIN submissions s ON s.assignment_id = a.assignment_id AND s.student_id = ?
@@ -41,26 +41,19 @@ exports.getAssignments = async (req, res) => {
         WHERE 1=1
         ORDER BY a.due_date ASC
       `;
-      params = [studentId, studentId];
-    } else if (instructorId) {
+      params = [userId, userId];
+    } else {
       query += `
         LEFT JOIN submissions s ON s.assignment_id = a.assignment_id
         LEFT JOIN submission_files sf ON sf.submission_id = s.submission_id
         WHERE c.instructor_id = ?
         ORDER BY a.due_date ASC
       `;
-      params = [instructorId];
-    } else {
-      query += `
-        LEFT JOIN submissions s ON s.assignment_id = a.assignment_id
-        LEFT JOIN submission_files sf ON sf.submission_id = s.submission_id
-        ORDER BY a.due_date ASC
-      `;
+      params = [userId];
     }
 
     const [assignments] = await db.query(query, params);
     res.status(200).json(assignments);
-    
   } catch (error) {
     console.error('Error retrieving assignments:', error);
     res.status(500).json({ message: 'Error retrieving assignments', error: error.message });
@@ -69,6 +62,7 @@ exports.getAssignments = async (req, res) => {
 
 // POST /api/assignments - Create new assignment (Faculty)
 exports.createAssignment = async (req, res) => {
+  const instructorId = req.user.user_id;
   const { course_id, title, description, due_date, max_marks } = req.body;
 
   if (!course_id || !title || !due_date || !max_marks) {
@@ -76,15 +70,24 @@ exports.createAssignment = async (req, res) => {
   }
 
   try {
+    const [[course]] = await db.query(
+      'SELECT course_id FROM courses WHERE course_id = ? AND instructor_id = ?',
+      [course_id, instructorId]
+    );
+
+    if (!course) {
+      return res.status(403).json({ message: 'You can only create assignments for your own courses' });
+    }
+
     const [result] = await db.query(
       `INSERT INTO assignments (course_id, title, description, due_date, max_marks)
        VALUES (?, ?, ?, ?, ?)`,
       [course_id, title, description || null, due_date, max_marks]
     );
 
-    res.status(201).json({ 
-      message: 'Assignment created successfully', 
-      assignment_id: result.insertId 
+    res.status(201).json({
+      message: 'Assignment created successfully',
+      assignment_id: result.insertId,
     });
   } catch (error) {
     console.error('Error creating assignment:', error);
@@ -95,7 +98,8 @@ exports.createAssignment = async (req, res) => {
 // POST /api/assignments/:id/submit - Submit assignment with file
 exports.submitAssignment = async (req, res) => {
   const assignmentId = req.params.id;
-  const { student_id, file_name, file_type, file_size, file_data } = req.body;
+  const student_id = req.user.user_id;
+  const { file_name, file_type, file_size, file_data } = req.body;
   const fileContent = decodeFile(file_data);
 
   if (!student_id || !file_name || !fileContent) {

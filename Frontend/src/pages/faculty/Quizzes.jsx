@@ -44,7 +44,7 @@ function Quizzes() {
 
   const loadData = async () => {
     const [courseData, quizData] = await Promise.all([
-      getCourses(),
+      getCourses(user?.user_id ? { instructorId: user.user_id } : {}),
       getQuizzes(user?.user_id ? { instructorId: user.user_id } : {}),
     ]);
     setCourses(courseData);
