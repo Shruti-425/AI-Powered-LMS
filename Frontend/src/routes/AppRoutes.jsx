@@ -10,6 +10,8 @@ import StudentDashboard from "../pages/student/Dashboard";
 import MyCourses from "../pages/student/MyCourses";
 import StudentAssignments from "../pages/student/Assignments";
 import StudentQuizzes from "../pages/student/Quizzes";
+import QuizTaker from "../pages/student/QuizTaker";
+import QuizResults from "../pages/student/QuizResults";
 import StudentAttendance from "../pages/student/Attendance";
 import AiTutor from "../pages/student/AITutor";
 import TaskManager from "../pages/student/TaskManager";
@@ -70,6 +72,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["student"]}>
             <StudentQuizzes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/quizzes/:quizId/take"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <QuizTaker />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/student/quizzes/:quizId/results"
+        element={
+          <ProtectedRoute allowedRoles={["student"]}>
+            <QuizResults />
           </ProtectedRoute>
         }
       />

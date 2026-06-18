@@ -335,9 +335,14 @@ exports.submitQuiz = async (req, res) => {
       return res.status(403).json({ message: 'You are not enrolled in this course' });
     }
 
+    const [[quizMeta]] = await connection.query(
+      'SELECT title, passing_marks, total_marks FROM quizzes WHERE quiz_id = ?',
+      [quizId]
+    );
+
     // Get quiz questions
     const [questions] = await connection.query(
-      'SELECT question_id, correct_answer, marks FROM questions WHERE quiz_id = ?',
+      'SELECT question_id, question_text, correct_answer, marks FROM questions WHERE quiz_id = ? ORDER BY question_id',
       [quizId]
     );
 
@@ -351,7 +356,14 @@ exports.submitQuiz = async (req, res) => {
       const answer = answers[question.question_id] || '';
       const isCorrect = normalizeAnswer(answer) === normalizeAnswer(question.correct_answer);
       if (isCorrect) marks += Number(question.marks);
-      return { questionId: question.question_id, answer, isCorrect };
+      return {
+        questionId: question.question_id,
+        question_text: question.question_text,
+        answer,
+        correct_answer: question.correct_answer,
+        marks: Number(question.marks),
+        isCorrect,
+      };
     });
 
     await connection.beginTransaction();
@@ -387,10 +399,18 @@ exports.submitQuiz = async (req, res) => {
 
     await connection.commit();
     
-    res.status(201).json({ 
-      message: 'Quiz submitted successfully', 
+    const totalMarks = questions.reduce((sum, q) => sum + Number(q.marks), 0);
+    const passingMarks = Number(quizMeta?.passing_marks || 0);
+
+    res.status(201).json({
+      message: 'Quiz submitted successfully',
+      quiz_id: Number(quizId),
+      title: quizMeta?.title,
       marks,
-      total_marks: questions.reduce((sum, q) => sum + Number(q.marks), 0)
+      total_marks: totalMarks,
+      passing_marks: passingMarks,
+      passed: marks >= passingMarks,
+      results: gradedAnswers,
     });
     
   } catch (error) {
