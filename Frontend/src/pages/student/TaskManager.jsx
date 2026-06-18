@@ -33,7 +33,8 @@ function TaskManager() {
       const response = await fetch(`${API_BASE_URL}?userId=${DEFAULT_USER_ID}`);
       if (response.ok) {
         const data = await response.json();
-        setTasks(data.map(normalizeTask));
+        const normalizedData = data.map(normalizeTask);
+        setTasks(normalizedData);
         setBackendOnline(true);
         setErrorMsg("");
       } else {
@@ -46,7 +47,8 @@ function TaskManager() {
       // LocalStorage Fallback
       const localTasks = localStorage.getItem(`tasks_user_${DEFAULT_USER_ID}`);
       if (localTasks) {
-        setTasks(JSON.parse(localTasks).map(normalizeTask));
+        const parsedTasks = JSON.parse(localTasks);
+        setTasks(parsedTasks.map(normalizeTask));
       } else {
         // Default seed tasks if no local storage
         const defaultTasks = [
@@ -81,7 +83,7 @@ function TaskManager() {
             completed: true
           }
         ];
-        setTasks(defaultTasks);
+        setTasks(defaultTasks.map(normalizeTask));
         localStorage.setItem(`tasks_user_${DEFAULT_USER_ID}`, JSON.stringify(defaultTasks));
       }
     } finally {
@@ -116,7 +118,7 @@ function TaskManager() {
         const response = await fetch(API_BASE_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(fullTaskData),
+          body: JSON.stringify(fullTaskData)
         });
         if (response.ok) {
           const result = await response.json();

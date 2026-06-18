@@ -3,8 +3,7 @@ import { FiClipboard } from "react-icons/fi";
 
 function Sidebar() {
   return (
-    <aside className="w-64 min-h-screen bg-slate-900 text-white">
-
+    <aside className="w-64 min-h-screen bg-slate-800 text-white">
       <div className="p-6 border-b border-slate-700">
         <h2 className="text-xl font-bold">
           Student Panel
@@ -12,7 +11,6 @@ function Sidebar() {
       </div>
 
       <ul className="p-4 space-y-3">
-
         <li>
           <Link
             to="/student"
@@ -76,7 +74,6 @@ function Sidebar() {
             Task Manager
           </Link>
         </li>
-
       </ul>
     </aside>
   );
