@@ -1,7 +1,5 @@
 -- ============================================================
--- COLLEGE LMS — STORED PROCEDURES
--- ============================================================
--- Encapsulate common business-logic operations.
+-- COLLEGE LMS — STORED PROCEDURES (FIXED)
 -- ============================================================
 
 USE college_lms;
@@ -11,7 +9,7 @@ DELIMITER $$
 -- -------------------------------------------------------
 -- SP1. ENROLL STUDENT IN A COURSE
 -- -------------------------------------------------------
-CREATE PROCEDURE sp_enroll_student (
+CREATE OR REPLACE PROCEDURE sp_enroll_student (
     IN p_student_id  INT,
     IN p_course_id   INT,
     OUT p_result     VARCHAR(100)
@@ -20,14 +18,12 @@ BEGIN
     DECLARE v_role VARCHAR(20);
     DECLARE v_exists INT DEFAULT 0;
 
-    -- Validate user is a student
     SELECT role INTO v_role FROM users WHERE user_id = p_student_id;
     IF v_role IS NULL THEN
         SET p_result = 'ERROR: Student not found';
     ELSEIF v_role <> 'student' THEN
         SET p_result = 'ERROR: User is not a student';
     ELSE
-        -- Check duplicate enrollment
         SELECT COUNT(*) INTO v_exists
         FROM enrollment
         WHERE student_id = p_student_id AND course_id = p_course_id;
@@ -46,7 +42,7 @@ END$$
 -- -------------------------------------------------------
 -- SP2. SUBMIT ASSIGNMENT
 -- -------------------------------------------------------
-CREATE PROCEDURE sp_submit_assignment (
+CREATE OR REPLACE PROCEDURE sp_submit_assignment (
     IN p_assignment_id  INT,
     IN p_student_id     INT,
     OUT p_result        VARCHAR(100)
@@ -55,45 +51,40 @@ BEGIN
     DECLARE v_exists INT DEFAULT 0;
     DECLARE v_course_id INT;
 
-    -- Verify the assignment exists and retrieve its course
     SELECT course_id INTO v_course_id
     FROM assignments
     WHERE assignment_id = p_assignment_id;
 
     IF v_course_id IS NULL THEN
         SET p_result = 'ERROR: Assignment not found';
-        LEAVE sp_submit_assignment;
-    END IF;
-
-    -- Verify student is enrolled in the course
-    SELECT COUNT(*) INTO v_exists
-    FROM enrollment
-    WHERE student_id = p_student_id AND course_id = v_course_id;
-
-    IF v_exists = 0 THEN
-        SET p_result = 'ERROR: Student not enrolled in the course';
-        LEAVE sp_submit_assignment;
-    END IF;
-
-    -- Check if already submitted
-    SELECT COUNT(*) INTO v_exists
-    FROM submissions
-    WHERE assignment_id = p_assignment_id AND student_id = p_student_id;
-
-    IF v_exists > 0 THEN
-        SET p_result = 'ERROR: Assignment already submitted';
     ELSE
-        INSERT INTO submissions (assignment_id, student_id, submitted_at)
-        VALUES (p_assignment_id, p_student_id, NOW());
+        SELECT COUNT(*) INTO v_exists
+        FROM enrollment
+        WHERE student_id = p_student_id AND course_id = v_course_id;
 
-        SET p_result = 'SUCCESS: Assignment submitted';
+        IF v_exists = 0 THEN
+            SET p_result = 'ERROR: Student not enrolled in the course';
+        ELSE
+            SELECT COUNT(*) INTO v_exists
+            FROM submissions
+            WHERE assignment_id = p_assignment_id AND student_id = p_student_id;
+
+            IF v_exists > 0 THEN
+                SET p_result = 'ERROR: Assignment already submitted';
+            ELSE
+                INSERT INTO submissions (assignment_id, student_id, submitted_at)
+                VALUES (p_assignment_id, p_student_id, NOW());
+
+                SET p_result = 'SUCCESS: Assignment submitted';
+            END IF;
+        END IF;
     END IF;
 END$$
 
 -- -------------------------------------------------------
 -- SP3. GRADE A SUBMISSION
 -- -------------------------------------------------------
-CREATE PROCEDURE sp_grade_submission (
+CREATE OR REPLACE PROCEDURE sp_grade_submission (
     IN p_submission_id   INT,
     IN p_marks_obtained  DECIMAL(5,2),
     OUT p_result         VARCHAR(100)
@@ -102,7 +93,6 @@ BEGIN
     DECLARE v_max_marks DECIMAL(5,2);
     DECLARE v_assignment_id INT;
 
-    -- Fetch the assignment's max marks
     SELECT a.max_marks, s.assignment_id
     INTO v_max_marks, v_assignment_id
     FROM submissions s
@@ -123,14 +113,11 @@ BEGIN
 END$$
 
 -- -------------------------------------------------------
--- SP4. MARK ATTENDANCE FOR A CLASS (bulk)
+-- SP4. MARK ATTENDANCE FOR A CLASS
 -- -------------------------------------------------------
--- Accepts a comma-separated list of student IDs who are present.
--- All other enrolled students are marked absent.
--- -------------------------------------------------------
-CREATE PROCEDURE sp_mark_attendance (
+CREATE OR REPLACE PROCEDURE sp_mark_attendance (
     IN p_class_id          INT,
-    IN p_present_student_ids TEXT     -- comma-separated: '1,3,5,8'
+    IN p_present_student_ids TEXT
 )
 BEGIN
     DECLARE v_course_id INT;
@@ -139,7 +126,6 @@ BEGIN
     SELECT course_id, class_date INTO v_course_id, v_class_date
     FROM classes WHERE class_id = p_class_id;
 
-    -- Insert attendance for all enrolled students
     INSERT INTO attendance (class_id, student_id, status, date)
     SELECT
         p_class_id,
@@ -157,11 +143,9 @@ BEGIN
 END$$
 
 -- -------------------------------------------------------
--- SP5. CALCULATE FINAL GRADE FOR A STUDENT IN A COURSE
+-- SP5. CALCULATE FINAL GRADE
 -- -------------------------------------------------------
--- Weightage: Assignments 40%, Quizzes 30%, Attendance 30%
--- -------------------------------------------------------
-CREATE PROCEDURE sp_calculate_grade (
+CREATE OR REPLACE PROCEDURE sp_calculate_grade (
     IN p_student_id  INT,
     IN p_course_id   INT,
     OUT p_final_marks DECIMAL(5,2),
@@ -172,7 +156,6 @@ BEGIN
     DECLARE v_quiz_pct       DECIMAL(5,2) DEFAULT 0;
     DECLARE v_attend_pct     DECIMAL(5,2) DEFAULT 0;
 
-    -- Assignment average percentage (40% weight)
     SELECT IFNULL(
         AVG(s.marks_obtained / a.max_marks * 100), 0
     ) INTO v_assignment_pct
@@ -182,17 +165,14 @@ BEGIN
       AND a.course_id  = p_course_id
       AND s.marks_obtained IS NOT NULL;
 
-        -- Quiz average percentage (30% weight)
-        -- Use quiz `total_marks` as denominator (fall back to 0 when absent)
-        SELECT IFNULL(
-                AVG(CASE WHEN q.total_marks > 0 THEN qr.marks / q.total_marks * 100 ELSE 0 END), 0
-        ) INTO v_quiz_pct
-        FROM quiz_responses qr
-        JOIN quizzes q ON q.quiz_id = qr.quiz_id
-        WHERE qr.student_id = p_student_id
-            AND q.course_id   = p_course_id;
+    SELECT IFNULL(
+        AVG(CASE WHEN q.total_marks > 0 THEN qr.marks / q.total_marks * 100 ELSE 0 END), 0
+    ) INTO v_quiz_pct
+    FROM quiz_responses qr
+    JOIN quizzes q ON q.quiz_id = qr.quiz_id
+    WHERE qr.student_id = p_student_id
+      AND q.course_id   = p_course_id;
 
-    -- Attendance percentage (30% weight)
     SELECT IFNULL(
         SUM(CASE WHEN a.status IN ('present','late') THEN 1 ELSE 0 END)
         / NULLIF(COUNT(*), 0) * 100, 0
@@ -202,7 +182,6 @@ BEGIN
     WHERE a.student_id = p_student_id
       AND cl.course_id = p_course_id;
 
-    -- Weighted final marks
     SET p_final_marks = ROUND(
         (v_assignment_pct * 0.40) +
         (v_quiz_pct       * 0.30) +
@@ -210,7 +189,6 @@ BEGIN
         2
     );
 
-    -- Map to letter grade
     SET p_grade = CASE
         WHEN p_final_marks >= 90 THEN 'A+'
         WHEN p_final_marks >= 80 THEN 'A'
@@ -218,10 +196,9 @@ BEGIN
         WHEN p_final_marks >= 60 THEN 'B'
         WHEN p_final_marks >= 50 THEN 'C'
         WHEN p_final_marks >= 40 THEN 'D'
-        ELSE                          'F'
+        ELSE 'F'
     END;
 
-    -- Upsert into grades table
     INSERT INTO grades (student_id, course_id, final_marks, grade)
     VALUES (p_student_id, p_course_id, p_final_marks, p_grade)
     ON DUPLICATE KEY UPDATE
@@ -230,9 +207,9 @@ BEGIN
 END$$
 
 -- -------------------------------------------------------
--- SP6. REFRESH DASHBOARD STATS FOR A STUDENT
+-- SP6. REFRESH DASHBOARD STATS
 -- -------------------------------------------------------
-CREATE PROCEDURE sp_refresh_dashboard_stats (
+CREATE OR REPLACE PROCEDURE sp_refresh_dashboard_stats (
     IN p_student_id INT
 )
 BEGIN
@@ -271,7 +248,7 @@ END$$
 -- -------------------------------------------------------
 -- SP7. GET STUDENT TRANSCRIPT
 -- -------------------------------------------------------
-CREATE PROCEDURE sp_get_transcript (
+CREATE OR REPLACE PROCEDURE sp_get_transcript (
     IN p_student_id INT
 )
 BEGIN
@@ -292,7 +269,3 @@ BEGIN
 END$$
 
 DELIMITER ;
-
--- ============================================================
--- END OF STORED PROCEDURES
--- ============================================================
