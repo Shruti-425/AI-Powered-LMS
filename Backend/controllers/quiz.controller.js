@@ -12,6 +12,17 @@ const parseOptions = (value) => {
 
 const normalizeAnswer = (value) => String(value || '').trim().toLowerCase();
 
+const verifyInstructorOwnsQuiz = async (quizId, instructorId) => {
+  const [[quiz]] = await db.query(
+    `SELECT q.quiz_id
+     FROM quizzes q
+     INNER JOIN courses c ON c.course_id = q.course_id
+     WHERE q.quiz_id = ? AND c.instructor_id = ?`,
+    [quizId, instructorId]
+  );
+  return quiz;
+};
+
 // GET /api/quizzes/courses - Get courses for dropdown
 exports.getCourses = async (req, res) => {
   try {
@@ -38,7 +49,8 @@ exports.getQuizzes = async (req, res) => {
         q.duration, 
         q.total_questions,
         q.passing_marks, 
-        q.total_marks, 
+        q.total_marks,
+        q.is_published,
         c.course_name, 
         c.code,
         qr.response_id, 
@@ -54,7 +66,7 @@ exports.getQuizzes = async (req, res) => {
       query += `
         INNER JOIN enrollment e ON e.course_id = q.course_id AND e.student_id = ?
         LEFT JOIN quiz_responses qr ON qr.quiz_id = q.quiz_id AND qr.student_id = ?
-        WHERE 1=1
+        WHERE q.is_published = TRUE
         ORDER BY q.quiz_id DESC
       `;
       params = [studentId, studentId];
@@ -96,6 +108,10 @@ exports.getQuiz = async (req, res) => {
 
     if (!quiz) {
       return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    if (req.query.publishedOnly === 'true' && !quiz.is_published) {
+      return res.status(403).json({ message: 'This quiz is not published yet' });
     }
 
     const [questions] = await db.query(
@@ -144,8 +160,8 @@ exports.createQuiz = async (req, res) => {
     const totalMarks = questions.reduce((sum, question) => sum + Number(question.marks || 1), 0);
     
     const [quizResult] = await connection.query(
-      `INSERT INTO quizzes (course_id, title, duration, total_questions, passing_marks, total_marks)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO quizzes (course_id, title, duration, total_questions, passing_marks, total_marks, is_published)
+       VALUES (?, ?, ?, ?, ?, ?, FALSE)`,
       [course_id, title, duration, questions.length, passing_marks || 0, totalMarks]
     );
 
@@ -176,6 +192,122 @@ exports.createQuiz = async (req, res) => {
     res.status(500).json({ message: 'Error creating quiz', error: error.message });
   } finally {
     connection.release();
+  }
+};
+
+// PUT /api/quizzes/:id - Update quiz and questions (Faculty)
+exports.updateQuiz = async (req, res) => {
+  const quizId = req.params.id;
+  const instructorId = req.user?.user_id;
+  const { course_id, title, duration, passing_marks, questions = [] } = req.body;
+
+  if (!instructorId) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  if (!title || !duration || questions.length === 0) {
+    return res.status(400).json({ message: 'Title, duration, and questions are required' });
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    const owned = await verifyInstructorOwnsQuiz(quizId, instructorId);
+    if (!owned) {
+      return res.status(404).json({ message: 'Quiz not found or access denied' });
+    }
+
+    const totalMarks = questions.reduce((sum, q) => sum + Number(q.marks || 1), 0);
+
+    await connection.beginTransaction();
+
+    await connection.query(
+      `UPDATE quizzes
+       SET course_id = ?, title = ?, duration = ?, total_questions = ?, passing_marks = ?, total_marks = ?
+       WHERE quiz_id = ?`,
+      [course_id, title, duration, questions.length, passing_marks || 0, totalMarks, quizId]
+    );
+
+    await connection.query('DELETE FROM questions WHERE quiz_id = ?', [quizId]);
+
+    for (const question of questions) {
+      await connection.query(
+        `INSERT INTO questions (quiz_id, question_text, type, question_options, correct_answer, marks)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          quizId,
+          question.question_text,
+          question.type || 'mcq',
+          JSON.stringify(question.options || []),
+          question.correct_answer,
+          question.marks || 1,
+        ]
+      );
+    }
+
+    await connection.commit();
+    res.status(200).json({ message: 'Quiz updated successfully', quiz_id: quizId });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error updating quiz:', error);
+    res.status(500).json({ message: 'Error updating quiz', error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// DELETE /api/quizzes/:id - Delete quiz (Faculty)
+exports.deleteQuiz = async (req, res) => {
+  const quizId = req.params.id;
+  const instructorId = req.user?.user_id;
+
+  if (!instructorId) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  try {
+    const owned = await verifyInstructorOwnsQuiz(quizId, instructorId);
+    if (!owned) {
+      return res.status(404).json({ message: 'Quiz not found or access denied' });
+    }
+
+    await db.query('DELETE FROM quizzes WHERE quiz_id = ?', [quizId]);
+    res.status(200).json({ message: 'Quiz deleted successfully', quiz_id: quizId });
+  } catch (error) {
+    console.error('Error deleting quiz:', error);
+    res.status(500).json({ message: 'Error deleting quiz', error: error.message });
+  }
+};
+
+// PUT /api/quizzes/:id/publish - Publish or unpublish quiz (Faculty)
+exports.publishQuiz = async (req, res) => {
+  const quizId = req.params.id;
+  const instructorId = req.user?.user_id;
+  const { is_published } = req.body;
+
+  if (!instructorId) {
+    return res.status(401).json({ message: 'Authentication required' });
+  }
+
+  try {
+    const owned = await verifyInstructorOwnsQuiz(quizId, instructorId);
+    if (!owned) {
+      return res.status(404).json({ message: 'Quiz not found or access denied' });
+    }
+
+    await db.query('UPDATE quizzes SET is_published = ? WHERE quiz_id = ?', [
+      Boolean(is_published),
+      quizId,
+    ]);
+
+    res.status(200).json({
+      message: is_published ? 'Quiz published successfully' : 'Quiz unpublished',
+      quiz_id: quizId,
+      is_published: Boolean(is_published),
+    });
+  } catch (error) {
+    console.error('Error publishing quiz:', error);
+    res.status(500).json({ message: 'Error updating publish status', error: error.message });
   }
 };
 

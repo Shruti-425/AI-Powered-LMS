@@ -1,23 +1,18 @@
 const express = require('express');
 const router = express.Router();
 const quizController = require('../controllers/quiz.controller');
+const { authenticate, authorize } = require('../middleware/auth.middleware');
 
-// GET /api/quizzes/courses - Get courses for dropdown
 router.get('/courses', quizController.getCourses);
-
-// GET /api/quizzes - Get quizzes (student or instructor)
 router.get('/', quizController.getQuizzes);
+router.post('/', authenticate, authorize('instructor'), quizController.createQuiz);
 
-// POST /api/quizzes - Create new quiz (Faculty)
-router.post('/', quizController.createQuiz);
+router.put('/:id/publish', authenticate, authorize('instructor'), quizController.publishQuiz);
+router.put('/:id', authenticate, authorize('instructor'), quizController.updateQuiz);
+router.delete('/:id', authenticate, authorize('instructor'), quizController.deleteQuiz);
 
-// GET /api/quizzes/:id - Get single quiz with questions
 router.get('/:id', quizController.getQuiz);
-
-// POST /api/quizzes/:id/submit - Submit quiz responses
 router.post('/:id/submit', quizController.submitQuiz);
-
-// GET /api/quizzes/:id/responses - Get all responses (Faculty)
-router.get('/:id/responses', quizController.getResponses);
+router.get('/:id/responses', authenticate, authorize('instructor'), quizController.getResponses);
 
 module.exports = router;
