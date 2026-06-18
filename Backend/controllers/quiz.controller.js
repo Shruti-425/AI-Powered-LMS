@@ -25,10 +25,20 @@ const verifyInstructorOwnsQuiz = async (quizId, instructorId) => {
 
 // GET /api/quizzes/courses - Get courses for dropdown
 exports.getCourses = async (req, res) => {
+  const { instructorId } = req.query;
+
   try {
-    const [courses] = await db.query(
-      'SELECT course_id, course_name, code FROM courses ORDER BY course_name'
-    );
+    let query = 'SELECT course_id, course_name, code FROM courses';
+    const params = [];
+
+    if (instructorId) {
+      query += ' WHERE instructor_id = ?';
+      params.push(instructorId);
+    }
+
+    query += ' ORDER BY course_name';
+
+    const [courses] = await db.query(query, params);
     res.status(200).json(courses);
   } catch (error) {
     console.error('Error retrieving courses:', error);
@@ -314,11 +324,8 @@ exports.publishQuiz = async (req, res) => {
 // POST /api/quizzes/:id/submit - Submit quiz responses
 exports.submitQuiz = async (req, res) => {
   const quizId = req.params.id;
-  const { student_id, answers = {} } = req.body;
-
-  if (!student_id) {
-    return res.status(400).json({ message: 'Student ID is required' });
-  }
+  const student_id = req.user.user_id;
+  const { answers = {} } = req.body;
 
   const connection = await db.getConnection();
 

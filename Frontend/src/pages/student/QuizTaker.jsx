@@ -37,17 +37,14 @@ function QuizTaker() {
     setError("");
 
     try {
-      const result = await submitQuiz(quiz.quiz_id, {
-        student_id: studentId,
-        answers,
-      });
+      const result = await submitQuiz(quiz.quiz_id, { answers });
       navigate(`/student/quizzes/${quiz.quiz_id}/results`, { state: { result } });
     } catch (err) {
       setError(err.message);
       submittingRef.current = false;
       setSubmitting(false);
     }
-  }, [answers, navigate, quiz, studentId]);
+  }, [answers, navigate, quiz]);
 
   useEffect(() => {
     if (!quizId || !studentId) return;

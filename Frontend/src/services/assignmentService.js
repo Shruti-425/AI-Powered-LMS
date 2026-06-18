@@ -1,12 +1,15 @@
 const API_URL = "http://localhost:5000/api/assignments";
 
+const getToken = () => localStorage.getItem("lms_token");
+
 const request = async (url, options = {}) => {
   const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
-      ...(options.headers || {})
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      ...(options.headers || {}),
     },
-    ...options
+    ...options,
   });
 
   const data = await response.json();
@@ -16,21 +19,18 @@ const request = async (url, options = {}) => {
   return data;
 };
 
-export const getAssignments = (params = {}) => {
-  const query = new URLSearchParams(params).toString();
-  return request(`${API_URL}${query ? `?${query}` : ""}`);
-};
+export const getAssignments = () => request(API_URL);
 
 export const createAssignment = (payload) =>
   request(API_URL, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
 export const submitAssignment = (assignmentId, payload) =>
   request(`${API_URL}/${assignmentId}/submit`, {
     method: "POST",
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
 export const getSubmissions = (assignmentId) =>

@@ -5,13 +5,16 @@ const normalizeTask = (task) => ({
   completed: Boolean(task.completed),
 });
 
-// Get all tasks for a specific user
-exports.getTasks = async (req, res) => {
-  const userId = req.query.userId;
+const verifyTaskOwner = async (taskId, userId) => {
+  const [[task]] = await db.query(
+    'SELECT task_id FROM tasks WHERE task_id = ? AND user_id = ?',
+    [taskId, userId]
+  );
+  return task;
+};
 
-  if (!userId) {
-    return res.status(400).json({ message: 'User ID is required' });
-  }
+exports.getTasks = async (req, res) => {
+  const userId = req.user.user_id;
 
   try {
     const [rows] = await db.query(
@@ -29,21 +32,12 @@ exports.getTasks = async (req, res) => {
   }
 };
 
-// Create a new task
 exports.createTask = async (req, res) => {
-  const {
-    user_id,
-    title,
-    description,
-    due_date,
-    priority,
-    category,
-  } = req.body;
+  const userId = req.user.user_id;
+  const { title, description, due_date, priority, category } = req.body;
 
-  if (!user_id || !title) {
-    return res.status(400).json({
-      message: 'User ID and Title are required',
-    });
+  if (!title) {
+    return res.status(400).json({ message: 'Title is required' });
   }
 
   try {
@@ -52,7 +46,7 @@ exports.createTask = async (req, res) => {
        (user_id, title, description, due_date, priority, category, completed)
        VALUES (?, ?, ?, ?, ?, ?, FALSE)`,
       [
-        user_id,
+        userId,
         title,
         description || null,
         due_date || null,
@@ -61,12 +55,7 @@ exports.createTask = async (req, res) => {
       ]
     );
 
-    const insertedId = result.insertId;
-
-    const [newTasks] = await db.query(
-      'SELECT * FROM tasks WHERE task_id = ?',
-      [insertedId]
-    );
+    const [newTasks] = await db.query('SELECT * FROM tasks WHERE task_id = ?', [result.insertId]);
 
     res.status(201).json({
       message: 'Task created successfully',
@@ -81,75 +70,36 @@ exports.createTask = async (req, res) => {
   }
 };
 
-// Update task details
 exports.updateTask = async (req, res) => {
   const taskId = req.params.id;
-
-  const {
-    title,
-    description,
-    due_date,
-    priority,
-    category,
-    completed,
-  } = req.body;
+  const userId = req.user.user_id;
+  const { title, description, due_date, priority, category, completed } = req.body;
 
   try {
-    const [existing] = await db.query(
-      'SELECT * FROM tasks WHERE task_id = ?',
-      [taskId]
-    );
-
-    if (existing.length === 0) {
-      return res.status(404).json({
-        message: 'Task not found',
-      });
+    const owned = await verifyTaskOwner(taskId, userId);
+    if (!owned) {
+      return res.status(404).json({ message: 'Task not found' });
     }
 
-    const t = existing[0];
-
-    const updatedTitle =
-      title !== undefined ? title : t.title;
-
-    const updatedDesc =
-      description !== undefined ? description : t.description;
-
-    const updatedDueDate =
-      due_date !== undefined ? due_date : t.due_date;
-
-    const updatedPriority =
-      priority !== undefined ? priority : t.priority;
-
-    const updatedCategory =
-      category !== undefined ? category : t.category;
-
-    const updatedCompleted =
-      completed !== undefined ? completed : t.completed;
+    const [[existing]] = await db.query('SELECT * FROM tasks WHERE task_id = ?', [taskId]);
 
     await db.query(
       `UPDATE tasks
-       SET title = ?,
-           description = ?,
-           due_date = ?,
-           priority = ?,
-           category = ?,
-           completed = ?
-       WHERE task_id = ?`,
+       SET title = ?, description = ?, due_date = ?, priority = ?, category = ?, completed = ?
+       WHERE task_id = ? AND user_id = ?`,
       [
-        updatedTitle,
-        updatedDesc,
-        updatedDueDate,
-        updatedPriority,
-        updatedCategory,
-        updatedCompleted,
+        title !== undefined ? title : existing.title,
+        description !== undefined ? description : existing.description,
+        due_date !== undefined ? due_date : existing.due_date,
+        priority !== undefined ? priority : existing.priority,
+        category !== undefined ? category : existing.category,
+        completed !== undefined ? completed : existing.completed,
         taskId,
+        userId,
       ]
     );
 
-    const [updatedTask] = await db.query(
-      'SELECT * FROM tasks WHERE task_id = ?',
-      [taskId]
-    );
+    const [updatedTask] = await db.query('SELECT * FROM tasks WHERE task_id = ?', [taskId]);
 
     res.status(200).json({
       message: 'Task updated successfully',
@@ -164,26 +114,17 @@ exports.updateTask = async (req, res) => {
   }
 };
 
-// Delete a task
 exports.deleteTask = async (req, res) => {
   const taskId = req.params.id;
+  const userId = req.user.user_id;
 
   try {
-    const [existing] = await db.query(
-      'SELECT * FROM tasks WHERE task_id = ?',
-      [taskId]
-    );
-
-    if (existing.length === 0) {
-      return res.status(404).json({
-        message: 'Task not found',
-      });
+    const owned = await verifyTaskOwner(taskId, userId);
+    if (!owned) {
+      return res.status(404).json({ message: 'Task not found' });
     }
 
-    await db.query(
-      'DELETE FROM tasks WHERE task_id = ?',
-      [taskId]
-    );
+    await db.query('DELETE FROM tasks WHERE task_id = ? AND user_id = ?', [taskId, userId]);
 
     res.status(200).json({
       message: 'Task deleted successfully',
