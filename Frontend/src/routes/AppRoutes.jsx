@@ -38,7 +38,6 @@ import Notifications from "../pages/shared/Notifications";
 function AppRoutes() {
   return (
     <Routes>
-
       {/* Authentication */}
       <Route path="/" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -46,90 +45,35 @@ function AppRoutes() {
       {/* Student Routes */}
       <Route path="/student" element={<StudentDashboard />} />
       <Route path="/student/courses" element={<MyCourses />} />
-      <Route
-        path="/student/assignments"
-        element={<StudentAssignments />}
-      />
-      <Route
-        path="/student/quizzes"
-        element={<StudentQuizzes />}
-      />
-      <Route
-        path="/student/attendance"
-        element={<StudentAttendance />}
-      />
-      <Route
-        path="/student/ai"
-        element={<AiTutor />}
-      />
-      <Route
-        path="/student/tasks"
-        element={<TaskManager />}
-      />
+      <Route path="/student/assignments" element={<StudentAssignments />} />
+      <Route path="/student/quizzes" element={<StudentQuizzes />} />
+      <Route path="/student/attendance" element={<StudentAttendance />} />
+      <Route path="/student/ai" element={<AiTutor />} />
+      <Route path="/student/tasks" element={<TaskManager />} />
 
       {/* Faculty Routes */}
       <Route path="/faculty" element={<FacultyDashboard />} />
       <Route path="/faculty/courses" element={<Courses />} />
-      <Route
-        path="/faculty/create-course"
-        element={<CreateCourse />}
-      />
-      <Route
-        path="/faculty/assignments"
-        element={<FacultyAssignments />}
-      />
-      <Route
-        path="/faculty/quizzes"
-        element={<FacultyQuizzes />}
-      />
-      <Route
-        path="/faculty/attendance"
-        element={<FacultyAttendance />}
-      />
-      <Route
-        path="/faculty/ai-tools"
-        element={<AiTools />}
-      />
+      <Route path="/faculty/create-course" element={<CreateCourse />} />
+      <Route path="/faculty/assignments" element={<FacultyAssignments />} />
+      <Route path="/faculty/quizzes" element={<FacultyQuizzes />} />
+      <Route path="/faculty/attendance" element={<FacultyAttendance />} />
+      <Route path="/faculty/ai-tools" element={<AiTools />} />
 
       {/* Super Admin Routes */}
-      <Route
-        path="/superadmin"
-        element={<AdminDashboard />}
-      />
-      <Route
-        path="/superadmin/faculty"
-        element={<ManageFaculty />}
-      />
-      <Route
-        path="/superadmin/students"
-        element={<ManageStudents />}
-      />
-      <Route
-        path="/superadmin/courses"
-        element={<ManageCourses />}
-      />
-      <Route
-        path="/superadmin/reports"
-        element={<Reports />}
-      />
-      <Route
-        path="/superadmin/analytics"
-        element={<Analytics />}
-      />
+      <Route path="/superadmin" element={<AdminDashboard />} />
+      <Route path="/superadmin/faculty" element={<ManageFaculty />} />
+      <Route path="/superadmin/students" element={<ManageStudents />} />
+      <Route path="/superadmin/courses" element={<ManageCourses />} />
+      <Route path="/superadmin/reports" element={<Reports />} />
+      <Route path="/superadmin/analytics" element={<Analytics />} />
 
       {/* Shared Routes */}
       <Route path="/profile" element={<Profile />} />
       <Route path="/settings" element={<Settings />} />
-      <Route
-        path="/notifications"
-        element={<Notifications />}
-      />
-
+      <Route path="/notifications" element={<Notifications />} />
     </Routes>
   );
 }
 
 export default AppRoutes;
-
-
-
